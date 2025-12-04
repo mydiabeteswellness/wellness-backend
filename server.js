@@ -7,7 +7,16 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://seashell-app-zv5w9.ondigitalocean.app",
+    "https://mdw.companyprofile.in/"
+  ],
+  methods: "GET,POST,PUT,PATCH,DELETE",
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
