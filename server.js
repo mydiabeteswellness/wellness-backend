@@ -7,20 +7,28 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "https://seashell-app-zv5w9.ondigitalocean.app",
-    "https://mdw.companyprofile.in/"
-  ],
-  methods: "GET,POST,PUT,PATCH,DELETE",
-  credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+
+// ✅ FIXED CORS — handles preflight + correct domains
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://mdw.companyprofile.in",
+      "https://seashell-app-zv5w9.ondigitalocean.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+// ✅ VERY IMPORTANT — handles OPTIONS requests
+app.options("*", cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 👉 PUT THIS EXACTLY HERE
+// Test route
 app.get("/", (req, res) => {
   res.send("Diabetes Wellness Backend API is running ✅");
 });
@@ -32,7 +40,6 @@ app.use("/api/subscription", require("./routes/subscriptionRoutes"));
 app.use("/api/appointments", require("./routes/appointmentRoutes"));
 app.use("/api/ai", require("./routes/aiRoutes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
