@@ -18,8 +18,10 @@ const auth = (roles = []) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded; // { id, role }
 
-      if (roles.length && !roles.includes(decoded.role)) {
-        return res.status(403).json({ msg: "Forbidden: insufficient role" });
+      if (decoded.role !== "SUPER_ADMIN") {
+        if (roles.length && !roles.includes(decoded.role)) {
+          return res.status(403).json({ msg: "Forbidden: insufficient role" });
+        }
       }
 
       next();

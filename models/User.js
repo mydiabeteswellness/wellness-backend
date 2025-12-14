@@ -10,9 +10,10 @@ const UserSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["PATIENT", "DOCTOR", "ADMIN"],
+      enum: ["PATIENT", "DOCTOR", "ADMIN", "SUPER_ADMIN"],
       default: "PATIENT",
     },
+
     plan: {
       type: String,
       enum: ["BASIC", "MID", "PREMIUM", null],
