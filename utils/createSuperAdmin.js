@@ -19,6 +19,7 @@ async function createSuperAdmin() {
   });
 
   console.log("🌟 Super Admin Created!");
+  console.log("bug fix 1126151225");
 }
 
 module.exports = createSuperAdmin;
