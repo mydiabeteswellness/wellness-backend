@@ -1,12 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const {
-  setPlan,
-  getMyPlan,
-} = require("../controllers/subscriptionController");
 const { auth } = require("../middleware/auth");
+const {
+  createSubscription,
+  verifySubscription,
+} = require("../controllers/subscriptionController");
 
-router.post("/set", auth(), setPlan);
-router.get("/me", auth(), getMyPlan);
+// user must be logged in (any role)
+router.post("/create", auth(), createSubscription);
+router.post("/verify", auth(), verifySubscription);
 
 module.exports = router;

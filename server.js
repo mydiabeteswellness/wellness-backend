@@ -35,6 +35,8 @@ app.get("/", (req, res) => {
 });
 
 // Routes
+
+
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
