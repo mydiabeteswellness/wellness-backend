@@ -18,6 +18,8 @@ app.use(
       "https://seashell-app-zv5w9.ondigitalocean.app",
       "https://diabeteswellnes.online",
       "https://www.diabeteswellnes.online",
+      "https://diabeteswellnes.health",
+      "https://www.diabeteswellnes.health",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
