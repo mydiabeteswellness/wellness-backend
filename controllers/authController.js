@@ -2,6 +2,9 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const PLANS = require("../config/plans.config");
+const generateOtp = require("../utils/generateOtp");
+const Otp = require("../models/Otp");
+const sendOtpEmail = require("../services/emailServices");
 
 /* =====================================================
    REGISTER USER (DEFAULT = FREE PLAN)
@@ -186,4 +189,65 @@ exports.me = async (req, res) => {
     console.error("ME ERROR 👉", err);
     res.status(500).json({ msg: "Server error" });
   }
+};
+
+
+exports.sendEmailOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email required" });
+  }
+
+  const otp = generateOtp();
+
+  await Otp.create({
+    identifier: email,
+    otp,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  });
+
+  await sendOtpEmail(email, otp);
+
+  res.json({ success: true, message: "OTP sent" });
+};
+
+
+
+exports.verifyEmailOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  const record = await Otp.findOne({ identifier: email, otp });
+
+  if (!record || record.expiresAt < new Date()) {
+    return res.status(400).json({ message: "Invalid or expired OTP" });
+  }
+
+  // Delete OTP
+  await Otp.deleteMany({ identifier: email });
+
+  // 🔍 CHECK USER
+  let user = await User.findOne({ email });
+
+  let isNewUser = false;
+
+  // 🆕 REGISTER IF NOT EXISTS
+  if (!user) {
+    user = await User.create({ email });
+    isNewUser = true;
+  }
+
+  // 🔐 ISSUE JWT
+  const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  res.json({
+    success: true,
+    isNewUser,
+    token,
+    user,
+  });
 };
