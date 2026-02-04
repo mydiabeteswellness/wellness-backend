@@ -27,7 +27,7 @@ const sendOtpEmail = async ({ email, name = "User", otp }) => {
       email: "info@mydiabeteswellness.health",
     },
     domain: "mydiabeteswellness.health",
-    template_id: "MDW_Login_OTP",
+    template_id: "mdw_login_",
   };
 
   const response = await fetch(url, {
