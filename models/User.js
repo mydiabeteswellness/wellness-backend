@@ -7,8 +7,15 @@ const UserSchema = new mongoose.Schema(
     ====================== */
     name: { type: String, required: true },
     email: { type: String, unique: true, required: true },
-    passwordHash: { type: String, required: true },
+    mobile: { type: String, required: true },
+
     isVerified: { type: Boolean, default: false },
+
+    authProvider: {
+      type: String,
+      enum: ["EMAIL_OTP"],
+      default: "EMAIL_OTP",
+    },
 
     role: {
       type: String,
@@ -27,7 +34,6 @@ const UserSchema = new mongoose.Schema(
 
     /* ======================
        FEATURE PRIVILEGES
-       (UPDATED ON UPGRADE)
     ====================== */
     features: {
       aiHealthInsights: { type: Boolean, default: false },
@@ -51,15 +57,14 @@ const UserSchema = new mongoose.Schema(
        AI CHAT / TOKEN SYSTEM
     ====================== */
     aiUsage: {
-      baseMonthlyTokens: { type: Number, default: 0 },  // from plan
-      extraPurchasedTokens: { type: Number, default: 0 }, // add-ons
+      baseMonthlyTokens: { type: Number, default: 0 },
+      extraPurchasedTokens: { type: Number, default: 0 },
       tokensUsedThisMonth: { type: Number, default: 0 },
       lastResetAt: { type: Date },
     },
 
     /* ======================
        SUBSCRIPTION DETAILS
-       (NULL FOR FREE)
     ====================== */
     subscription: {
       razorpayCustomerId: String,
@@ -79,7 +84,7 @@ const UserSchema = new mongoose.Schema(
     },
 
     /* ======================
-       PLAN HISTORY (AUDIT)
+       PLAN HISTORY
     ====================== */
     planHistory: [
       {
@@ -90,7 +95,7 @@ const UserSchema = new mongoose.Schema(
         },
         activatedAt: Date,
         expiredAt: Date,
-        reason: String, // upgrade / downgrade / expired
+        reason: String,
       },
     ],
   },

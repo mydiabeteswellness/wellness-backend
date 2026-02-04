@@ -64,6 +64,7 @@ app.use("/api/ai", require("./routes/aiRoutes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/plans", require("./routes/planRoutes"));
 
+console.log("MSG91 KEY:", process.env.MSG91_AUTHKEY ? "LOADED" : "MISSING");
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

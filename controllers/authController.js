@@ -6,122 +6,6 @@ const generateOtp = require("../utils/generateOtp");
 const Otp = require("../models/Otp");
 const sendOtpEmail = require("../services/emailServices");
 
-/* =====================================================
-   REGISTER USER (DEFAULT = FREE PLAN)
-===================================================== */
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        msg: "Name, email, and password are required",
-      });
-    }
-
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(400).json({ msg: "Email already registered" });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-
-    const freePlan = PLANS.FREE;
-
-    const user = await User.create({
-      name,
-      email,
-      passwordHash: hash,
-      role: role || "PATIENT",
-
-      // 🔑 DEFAULT PLAN
-      plan: "FREE",
-
-      // 🔓 DEFAULT FEATURES
-      features: freePlan.features,
-
-      // 🧠 AI USAGE INITIALIZATION
-      aiUsage: {
-        baseMonthlyTokens: freePlan.aiTokens,
-        tokensUsedThisMonth: 0,
-        extraPurchasedTokens: 0,
-        lastResetAt: new Date(),
-      },
-
-      // 🧾 PLAN HISTORY
-      planHistory: [
-        {
-          plan: "FREE",
-          activatedAt: new Date(),
-          reason: "signup",
-        },
-      ],
-    });
-
-    return res.status(201).json({
-      msg: "Registration successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        plan: user.plan,
-      },
-    });
-  } catch (err) {
-    console.error("REGISTER ERROR 👉", err);
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-/* =====================================================
-   LOGIN USER
-===================================================== */
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ msg: "Invalid credentials" });
-    }
-
-    const match = await bcrypt.compare(password, user.passwordHash);
-    if (!match) {
-      return res.status(400).json({ msg: "Invalid credentials" });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-    });
-
-    return res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        plan: user.plan,
-      },
-    });
-  } catch (err) {
-    console.error("LOGIN ERROR 👉", err);
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-/* =====================================================
-   CURRENT USER (DASHBOARD-READY)
-===================================================== */
 exports.me = async (req, res) => {
   try {
     let user = await User.findById(req.user.id).select("-passwordHash");
@@ -129,11 +13,6 @@ exports.me = async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
-
-    /* ===============================
-       SAFETY FALLBACK (VERY IMPORTANT)
-       Fix users with plan = null
-    =============================== */
     if (!user.plan) {
       const freePlan = PLANS.FREE;
 
@@ -193,61 +72,204 @@ exports.me = async (req, res) => {
 
 
 exports.sendEmailOtp = async (req, res) => {
-  const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ message: "Email required" });
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
+    }
+
+    const otp = generateOtp();
+
+    // OPTIONAL but recommended: remove old OTPs
+    await Otp.deleteMany({ identifier: email });
+
+    await Otp.create({
+      identifier: email,
+      otp,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    // 🔥 MUST be awaited + error-handled
+    await sendOtpEmail(email, otp);
+
+    return res.json({
+      success: true,
+      message: "OTP sent",
+    });
+  } catch (error) {
+    console.error("SEND EMAIL OTP ERROR:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send OTP",
+    });
   }
-
-  const otp = generateOtp();
-
-  await Otp.create({
-    identifier: email,
-    otp,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-  });
-
-  await sendOtpEmail(email, otp);
-
-  res.json({ success: true, message: "OTP sent" });
 };
+
 
 
 
 exports.verifyEmailOtp = async (req, res) => {
-  const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-  const record = await Otp.findOne({ identifier: email, otp });
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP required",
+      });
+    }
 
-  if (!record || record.expiresAt < new Date()) {
-    return res.status(400).json({ message: "Invalid or expired OTP" });
+    // 🔑 Ensure OTP is string-safe
+    const record = await Otp.findOne({
+      identifier: email,
+      otp: String(otp),
+    });
+
+    if (!record || record.expiresAt < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    await Otp.deleteMany({ identifier: email });
+
+    // 🔍 USER MUST EXIST
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not registered. Please sign up.",
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("VERIFY EMAIL OTP ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "OTP verification failed",
+    });
   }
-
-  // Delete OTP
-  await Otp.deleteMany({ identifier: email });
-
-  // 🔍 CHECK USER
-  let user = await User.findOne({ email });
-
-  let isNewUser = false;
-
-  // 🆕 REGISTER IF NOT EXISTS
-  if (!user) {
-    user = await User.create({ email });
-    isNewUser = true;
-  }
-
-  // 🔐 ISSUE JWT
-  const token = jwt.sign(
-    { userId: user._id },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-
-  res.json({
-    success: true,
-    isNewUser,
-    token,
-    user,
-  });
 };
+
+
+exports.sendRegisterOtp = async (req, res) => {
+  try {
+    const { name, email, mobile, role } = req.body;
+
+    if (!name || !email || !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and mobile are required",
+      });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "User already registered. Please login.",
+      });
+    }
+
+    const otp = generateOtp();
+
+    await Otp.deleteMany({ identifier: email });
+
+    await Otp.create({
+      identifier: email,
+      otp,
+      payload: { name, email, mobile, role },
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    await sendOtpEmail(email, otp);
+
+    return res.json({
+      success: true,
+      message: "OTP sent to email",
+    });
+  } catch (err) {
+    console.error("REGISTER OTP ERROR 👉", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+exports.verifyRegisterOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const record = await Otp.findOne({ identifier: email, otp });
+
+    if (!record || record.expiresAt < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    if (!record.payload) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration data missing. Please register again.",
+      });
+    }
+
+    const { name, mobile, role } = record.payload;
+
+    const user = await User.create({
+      name,
+      email,
+      mobile,
+      role: role || "PATIENT",
+      plan: "FREE",
+      isVerified: true,
+    });
+
+    await Otp.deleteMany({ identifier: email });
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      user,
+    });
+  } catch (err) {
+    console.error("VERIFY REGISTER OTP ERROR 👉", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+
+console.log({
+  sendRegisterOtp: typeof exports.sendRegisterOtp,
+  verifyRegisterOtp: typeof exports.verifyRegisterOtp,
+  sendEmailOtp: typeof exports.sendEmailOtp,
+  verifyEmailOtp: typeof exports.verifyEmailOtp,
+});
+
+// console.log("OTP RECORD FOUND:", record);
+

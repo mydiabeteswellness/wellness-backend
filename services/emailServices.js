@@ -1,58 +1,70 @@
-const fetch = require("node-fetch");
+const https = require("https");
 
-const sendOtpEmail = async ({ email, name = "User", otp }) => {
-  const url = "https://control.msg91.com/api/v5/email/send";
-
-  const body = {
-    recipients: [
-      {
-        to: [{ email, name }],
-        variables: {
-          VAR1: name,
-          VAR2: otp,
-          VAR3: "5",
+module.exports = function sendOtpEmail(email, otp) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      recipients: [
+        {
+          to: [
+            {
+              name: email,
+              email: email,
+            },
+          ],
+          variables: {
+            VAR1: email,        // Hello {{VAR1}}
+            VAR2: otp,          // {{VAR2}}
+            VAR3: 10,           // {{VAR3}} minutes
+          },
         },
+      ],
+      from: {
+        name: "My Diabetes Wellness",
+        email: "info@mydiabeteswellness.health",
       },
-    ],
-    from: {
-      email: "info@mydiabeteswellness.health",
-      name: "My Diabetes Wellness",
-    },
-    reply_to: {
-      email: "info@mydiabeteswellness.health",
-    },
-    domain: "mydiabeteswellness.health",
-
-    // ✅ YOUR VERIFIED TEMPLATE
-    template_id: "mdw_login_",
-  };
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        authkey: process.env.MSG91_AUTHKEY,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
+      domain: "mail.mydiabeteswellness.health",
+      template_id: "mdw_login_", // ✅ approved template ID
     });
 
-    const data = await response.json();
+    const options = {
+      hostname: "control.msg91.com",
+      path: "/api/v5/email/send",
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authkey: process.env.MSG91_AUTHKEY,
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(payload),
+      },
+      timeout: 8000, // 🔥 prevents hanging
+    };
 
-    if (!response.ok || data?.status === "error") {
-      console.error("❌ MSG91 ERROR:", data);
-      throw new Error("Email send failed");
-    }
+    const req = https.request(options, (res) => {
+      let body = "";
 
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
+      res.on("data", (chunk) => (body += chunk));
+
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(body);
+        } else {
+          reject(
+            new Error(`MSG91 error ${res.statusCode}: ${body}`)
+          );
+        }
+      });
+    });
+
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("MSG91 request timeout"));
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    req.write(payload);
+    req.end();
+  });
 };
-
-module.exports = sendOtpEmail;
