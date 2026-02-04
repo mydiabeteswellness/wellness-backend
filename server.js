@@ -3,8 +3,8 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const createSuperAdmin = require("./utils/createSuperAdmin");
-createSuperAdmin();
 dotenv.config();
+createSuperAdmin();
 connectDB();
 
 const app = express();
@@ -28,11 +28,20 @@ app.use(
 );
 
 // Handle preflight requests
-app.options("*", cors());
-
-
 // ✅ VERY IMPORTANT — handles OPTIONS requests
-app.options("*", cors());
+app.options("*", cors({
+  origin: [
+    "http://localhost:3000",
+    "https://mdw.companyprofile.in",
+    "https://seashell-app-zv5w9.ondigitalocean.app",
+    "https://diabeteswellnes.online",
+    "https://www.diabeteswellnes.online",
+    "https://mydiabeteswellness.health",
+    "https://www.mydiabeteswellness.health",
+  ],
+  credentials: true,
+}));
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
