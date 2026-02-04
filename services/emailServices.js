@@ -6,12 +6,7 @@ const sendOtpEmail = async ({ email, name = "User", otp }) => {
   const body = {
     recipients: [
       {
-        to: [
-          {
-            email,
-            name,
-          },
-        ],
+        to: [{ email, name }],
         variables: {
           VAR1: name,
           VAR2: otp,
@@ -27,28 +22,37 @@ const sendOtpEmail = async ({ email, name = "User", otp }) => {
       email: "info@mydiabeteswellness.health",
     },
     domain: "mydiabeteswellness.health",
+
+    // ✅ YOUR VERIFIED TEMPLATE
     template_id: "mdw_login_",
   };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      authkey: process.env.MSG91_AUTHKEY,
-    },
-    body: JSON.stringify(body),
-    timeout: 10000, // 10s safety timeout
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
 
-  const data = await response.json();
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        authkey: process.env.MSG91_AUTHKEY,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
 
-  if (!response.ok || data?.status === "error") {
-    console.error("MSG91 Email Error:", data);
-    throw new Error("MSG91 email send failed");
+    const data = await response.json();
+
+    if (!response.ok || data?.status === "error") {
+      console.error("❌ MSG91 ERROR:", data);
+      throw new Error("Email send failed");
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return data;
 };
 
 module.exports = sendOtpEmail;
