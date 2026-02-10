@@ -9,6 +9,8 @@ require("dotenv").config();
 
     const freePlan = PLANS.FREE;
 
+
+    console.log(freePlan)
     const result = await User.updateMany(
       { plan: null },
       {

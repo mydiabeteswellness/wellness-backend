@@ -6,6 +6,8 @@ const generateOtp = require("../utils/generateOtp");
 const Otp = require("../models/Otp");
 const sendOtpEmail = require("../services/emailServices");
 
+const applyPlan = require("../utils/applyPlan");
+
 exports.me = async (req, res) => {
   try {
     let user = await User.findById(req.user.id).select("-passwordHash");
@@ -13,30 +15,15 @@ exports.me = async (req, res) => {
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
     }
-    if (!user.plan) {
-      const freePlan = PLANS.FREE;
 
-      user.plan = "FREE";
-      user.features = freePlan.features;
-      user.aiUsage = {
-        baseMonthlyTokens: freePlan.aiTokens,
-        tokensUsedThisMonth: 0,
-        extraPurchasedTokens: 0,
-        lastResetAt: new Date(),
-      };
-
-      user.subscription = {
-        status: "none",
-      };
-
-      user.planHistory = [
-        {
-          plan: "FREE",
-          activatedAt: new Date(),
-          reason: "auto-fix",
-        },
-      ];
-
+    // 🔥 AUTO-FIX USERS WITH BROKEN FREE PLAN
+    if (
+      !user.plan ||
+      !user.features ||
+      !user.aiUsage ||
+      user.aiUsage.baseMonthlyTokens === 0
+    ) {
+      applyPlan(user, user.plan || "FREE");
       await user.save();
     }
 
@@ -69,6 +56,7 @@ exports.me = async (req, res) => {
     res.status(500).json({ msg: "Server error" });
   }
 };
+
 
 
 exports.sendEmailOtp = async (req, res) => {
@@ -209,12 +197,11 @@ exports.sendRegisterOtp = async (req, res) => {
   }
 };
 
-
 exports.verifyRegisterOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    const record = await Otp.findOne({ identifier: email, otp });
+    const record = await Otp.findOne({ identifier: email, otp: String(otp) });
 
     if (!record || record.expiresAt < new Date()) {
       return res.status(400).json({
@@ -226,21 +213,24 @@ exports.verifyRegisterOtp = async (req, res) => {
     if (!record.payload) {
       return res.status(400).json({
         success: false,
-        message: "Registration data missing. Please register again.",
+        message: "Registration data missing",
       });
     }
 
     const { name, mobile, role } = record.payload;
 
-    const user = await User.create({
+    const user = new User({
       name,
       email,
       mobile,
       role: role || "PATIENT",
-      plan: "FREE",
       isVerified: true,
     });
 
+    // ✅ APPLY FREE PLAN PROPERLY
+    applyPlan(user, "FREE");
+
+    await user.save();
     await Otp.deleteMany({ identifier: email });
 
     const token = jwt.sign(
@@ -262,6 +252,7 @@ exports.verifyRegisterOtp = async (req, res) => {
     });
   }
 };
+
 
 
 console.log({
