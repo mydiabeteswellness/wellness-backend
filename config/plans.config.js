@@ -3,7 +3,7 @@
 const PLANS = {
   FREE: {
     price: 0,
-    aiTokens: 2000,
+    aiTokens: 20000,
     features: {
       aiHealthInsights: true,
       educationalContent: true,
@@ -13,7 +13,7 @@ const PLANS = {
 
   BASIC: {
     price: 750,
-    aiTokens: 10000,
+    aiTokens: 30000,
     features: {
       aiHealthInsights: true,
       dietRecommendations: true,
@@ -25,7 +25,7 @@ const PLANS = {
 
   MID: {
     price: 1800,
-    aiTokens: 50000,
+    aiTokens: 90000,
     features: {
       aiHealthInsights: true,
       dietRecommendations: true,
@@ -42,7 +42,7 @@ const PLANS = {
 
   PREMIUM: {
     price: 3600,
-    aiTokens: 150000,
+    aiTokens: 300000,
     features: {
       aiHealthInsights: true,
       dietRecommendations: true,
