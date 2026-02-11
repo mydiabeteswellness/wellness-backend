@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema(
     ====================== */
     name: { type: String, required: true },
     email: { type: String, unique: true, required: true },
-    mobile: { type: String, required: true },
+    mobile: { type: String },
 
     isVerified: { type: Boolean, default: false },
 
@@ -24,12 +24,60 @@ const UserSchema = new mongoose.Schema(
     },
 
     /* ======================
-       CURRENT PLAN (ACTIVE)
+       CURRENT PLAN
     ====================== */
     plan: {
       type: String,
       enum: ["FREE", "BASIC", "MID", "PREMIUM"],
       default: "FREE",
+    },
+
+    /* ======================
+       CONSULTATION ENTITLEMENTS
+    ====================== */
+    consultationEntitlements: {
+      monthlyLimit: { type: Number, default: 0 },
+      includes: [
+        {
+          type: String,
+          enum: [
+            "Call to Expert",
+            "Dietitian Consultation",
+            "Doctor Consultation",
+            "Health Coach Consultation",
+          ],
+        },
+      ],
+    },
+
+    /* ======================
+       CONSULTATION USAGE
+    ====================== */
+    consultationUsage: {
+      usedThisMonth: { type: Number, default: 0 },
+      breakdown: [
+        {
+          type: {
+            type: String,
+            enum: [
+              "Call to Expert",
+              "Dietitian Consultation",
+              "Doctor Consultation",
+              "Health Coach Consultation",
+            ],
+          },
+          usedAt: { type: Date, default: Date.now },
+        },
+      ],
+      lastResetAt: Date,
+    },
+
+    /* ======================
+       CALL TO EXPERT
+    ====================== */
+    callToExpert: {
+      enabled: { type: Boolean, default: false },
+      lastCalledAt: Date,
     },
 
     /* ======================
@@ -42,29 +90,27 @@ const UserSchema = new mongoose.Schema(
       educationalContent: { type: Boolean, default: false },
       communityAccess: { type: Boolean, default: false },
 
-      doctorConsultation: { type: Boolean, default: false },
       personalizedMealPlans: { type: Boolean, default: false },
       exerciseRecommendations: { type: Boolean, default: false },
       prioritySupport: { type: Boolean, default: false },
 
-      supplementPlan: { type: Boolean, default: false },
-      chatSupport247: { type: Boolean, default: false },
       advancedAnalytics: { type: Boolean, default: false },
       careCoordinator: { type: Boolean, default: false },
+      chatSupport247: { type: Boolean, default: false },
     },
 
     /* ======================
-       AI CHAT / TOKEN SYSTEM
+       AI TOKENS
     ====================== */
     aiUsage: {
       baseMonthlyTokens: { type: Number, default: 0 },
       extraPurchasedTokens: { type: Number, default: 0 },
       tokensUsedThisMonth: { type: Number, default: 0 },
-      lastResetAt: { type: Date },
+      lastResetAt: Date,
     },
 
     /* ======================
-       SUBSCRIPTION DETAILS
+       SUBSCRIPTION
     ====================== */
     subscription: {
       razorpayCustomerId: String,
@@ -91,7 +137,6 @@ const UserSchema = new mongoose.Schema(
         plan: {
           type: String,
           enum: ["FREE", "BASIC", "MID", "PREMIUM"],
-          default: "FREE",
         },
         activatedAt: Date,
         expiredAt: Date,

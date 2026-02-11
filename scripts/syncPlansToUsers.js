@@ -15,7 +15,7 @@ const PLANS = require("../config/plans.config");
         { plan: planKey },
         {
           $set: {
-            "aiUsage.baseMonthlyTokens": planConfig.aiTokens,
+            "aiUsage.baseMonthlyTokens": planConfig.mdwTokens,
             features: planConfig.features,
           },
         }

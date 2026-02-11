@@ -16,7 +16,7 @@ exports.me = async (req, res) => {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // 🔥 AUTO-FIX USERS WITH BROKEN FREE PLAN
+    // 🔥 AUTO-FIX USERS WITH BROKEN PLAN DATA
     if (
       !user.plan ||
       !user.features ||
@@ -27,27 +27,31 @@ exports.me = async (req, res) => {
       await user.save();
     }
 
-    const totalTokens =
-      user.aiUsage.baseMonthlyTokens +
-      user.aiUsage.extraPurchasedTokens;
-
-    const remainingTokens =
-      totalTokens - user.aiUsage.tokensUsedThisMonth;
-
     return res.json({
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+
         plan: user.plan,
+
+        /* ✅ REQUIRED BY UI */
+        consultationEntitlements: user.consultationEntitlements,
+
         features: user.features,
-        subscription: user.subscription,
+
         aiUsage: {
-          totalTokens,
-          used: user.aiUsage.tokensUsedThisMonth,
-          remaining: remainingTokens,
+          baseMonthlyTokens: user.aiUsage.baseMonthlyTokens,
+          extraPurchasedTokens: user.aiUsage.extraPurchasedTokens,
+          tokensUsedThisMonth: user.aiUsage.tokensUsedThisMonth,
         },
+
+        subscription: {
+          status: user.subscription.status,
+          currentPeriodEnd: user.subscription.currentPeriodEnd,
+        },
+
         createdAt: user.createdAt,
       },
     });
@@ -59,17 +63,31 @@ exports.me = async (req, res) => {
 
 
 
+
 exports.sendEmailOtp = async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: "Email required" });
+      return res.status(400).json({
+        success: false,
+        message: "Email required",
+      });
+    }
+
+    // ✅ CHECK: user must already exist
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not registered. Please sign up.",
+      });
     }
 
     const otp = generateOtp();
 
-    // OPTIONAL but recommended: remove old OTPs
+    // Remove old OTPs
     await Otp.deleteMany({ identifier: email });
 
     await Otp.create({
@@ -78,22 +96,21 @@ exports.sendEmailOtp = async (req, res) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    // 🔥 MUST be awaited + error-handled
     await sendOtpEmail(email, otp);
 
     return res.json({
       success: true,
-      message: "OTP sent",
+      message: "OTP sent to registered email",
     });
   } catch (error) {
-    console.error("SEND EMAIL OTP ERROR:", error.message);
-
+    console.error("SEND EMAIL OTP ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to send OTP",
     });
   }
 };
+
 
 
 

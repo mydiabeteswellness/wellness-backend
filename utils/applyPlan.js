@@ -7,7 +7,7 @@ module.exports = function applyPlan(user, planKey = "FREE") {
   user.plan = planKey;
   user.features = plan.features;
   user.aiUsage = {
-    baseMonthlyTokens: plan.aiTokens,
+    baseMonthlyTokens: plan.mdwTokens,
     tokensUsedThisMonth: 0,
     extraPurchasedTokens: 0,
     lastResetAt: new Date(),

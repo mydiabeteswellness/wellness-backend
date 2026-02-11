@@ -18,7 +18,7 @@ require("dotenv").config();
           plan: "FREE",
           features: freePlan.features,
           aiUsage: {
-            baseMonthlyTokens: freePlan.aiTokens,
+            baseMonthlyTokens: freePlan.mdwTokens,
             tokensUsedThisMonth: 0,
             extraPurchasedTokens: 0,
             lastResetAt: new Date(),

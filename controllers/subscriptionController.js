@@ -51,12 +51,9 @@ exports.verifySubscription = async (req, res) => {
       plan,
     } = req.body;
 
-    /* ---------- Signature Verification ---------- */
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(
-        `${razorpay_payment_id}|${razorpay_subscription_id}`
-      )
+      .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
       .digest("hex");
 
     if (generatedSignature !== razorpay_signature) {
@@ -64,16 +61,14 @@ exports.verifySubscription = async (req, res) => {
     }
 
     const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ msg: "User not found" });
-    }
+    if (!user) return res.status(404).json({ msg: "User not found" });
 
     const planConfig = PLANS[plan];
     if (!planConfig) {
       return res.status(400).json({ msg: "Invalid plan configuration" });
     }
 
-    /* ---------- Save Old Plan to History ---------- */
+    /* ---------- PLAN HISTORY ---------- */
     if (user.plan) {
       user.planHistory.push({
         plan: user.plan,
@@ -83,27 +78,55 @@ exports.verifySubscription = async (req, res) => {
       });
     }
 
-    /* ---------- Apply New Plan ---------- */
+    /* ---------- APPLY PLAN ---------- */
     user.plan = plan;
 
     user.features = {
-      ...user.features,
+      aiHealthInsights: false,
+      dietRecommendations: false,
+      bloodSugarTracking: false,
+      educationalContent: false,
+      communityAccess: false,
+      personalizedMealPlans: false,
+      exerciseRecommendations: false,
+      prioritySupport: false,
+      advancedAnalytics: false,
+      careCoordinator: false,
+      chatSupport247: false,
       ...planConfig.features,
     };
 
-    user.aiUsage.baseMonthlyTokens = planConfig.aiTokens;
-    user.aiUsage.tokensUsedThisMonth = 0;
-    user.aiUsage.extraPurchasedTokens = 0;
-    user.aiUsage.lastResetAt = new Date();
+    /* ---------- CONSULTATION ---------- */
+    user.consultationEntitlements = {
+      monthlyLimit: planConfig.consultation.monthly,
+      includes: planConfig.consultation.includes,
+    };
 
+    user.consultationUsage = {
+      usedThisMonth: 0,
+      breakdown: [],
+      lastResetAt: new Date(),
+    };
+
+    user.callToExpert = {
+      enabled: planConfig.consultation.includes.includes("Call to Expert"),
+    };
+
+    /* ---------- AI TOKENS ---------- */
+    user.aiUsage = {
+      baseMonthlyTokens: planConfig.mdwTokens,
+      extraPurchasedTokens: 0,
+      tokensUsedThisMonth: 0,
+      lastResetAt: new Date(),
+    };
+
+    /* ---------- SUBSCRIPTION ---------- */
     user.subscription = {
       razorpaySubscriptionId: razorpay_subscription_id,
       razorpayPlanId: RAZORPAY_PLANS[plan],
       status: "active",
       startedAt: new Date(),
-      currentPeriodEnd: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
-      ),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       autoRenew: true,
     };
 
@@ -112,8 +135,8 @@ exports.verifySubscription = async (req, res) => {
     return res.json({
       msg: "Subscription activated successfully",
       plan,
-      features: user.features,
-      aiTokens: planConfig.aiTokens,
+      consultation: user.consultationEntitlements,
+      mdwTokens: user.aiUsage.baseMonthlyTokens,
       nextRenewal: user.subscription.currentPeriodEnd,
     });
   } catch (err) {
@@ -121,6 +144,7 @@ exports.verifySubscription = async (req, res) => {
     return res.status(500).json({ msg: "Server error" });
   }
 };
+
 
 
 // ===============================
@@ -169,32 +193,41 @@ exports.handleWebhook = async (req, res) => {
     /* ===============================
        PAYMENT FAILED / CANCELLED
     =============================== */
-    if (
-      event === "subscription.cancelled" ||
-      event === "payment.failed"
-    ) {
-      const subscriptionId = payload.subscription.entity.id;
+   if (event === "subscription.cancelled" || event === "payment.failed") {
+  const subscriptionId = payload.subscription.entity.id;
 
-      const user = await User.findOne({
-        "subscription.razorpaySubscriptionId": subscriptionId,
-      });
+  const user = await User.findOne({
+    "subscription.razorpaySubscriptionId": subscriptionId,
+  });
 
-      if (user) {
-        // 🔻 Downgrade to FREE
-        user.plan = "FREE";
-        user.features = PLANS.FREE.features;
-        user.aiUsage.baseMonthlyTokens = PLANS.FREE.aiTokens;
-        user.subscription.status = "expired";
+  if (user) {
+    const freePlan = PLANS.FREE;
 
-        user.planHistory.push({
-          plan: "FREE",
-          activatedAt: new Date(),
-          reason: "payment_failed_or_cancelled",
-        });
+    user.plan = "FREE";
+    user.features = freePlan.features;
 
-        await user.save();
-      }
-    }
+    user.consultationEntitlements = {
+      monthlyLimit: freePlan.consultation.monthly,
+      includes: freePlan.consultation.includes,
+    };
+
+    user.callToExpert = {
+      enabled: true,
+    };
+
+    user.aiUsage.baseMonthlyTokens = freePlan.mdwTokens;
+    user.subscription.status = "expired";
+
+    user.planHistory.push({
+      plan: "FREE",
+      activatedAt: new Date(),
+      reason: "payment_failed_or_cancelled",
+    });
+
+    await user.save();
+  }
+}
+
 
     return res.json({ status: "ok" });
   } catch (err) {
