@@ -5,7 +5,7 @@ const PLANS = require("../config/plans.config");
 const generateOtp = require("../utils/generateOtp");
 const Otp = require("../models/Otp");
 const sendOtpEmail = require("../services/emailServices");
-
+require("dotenv").config();
 const applyPlan = require("../utils/applyPlan");
 
 exports.me = async (req, res) => {
@@ -61,13 +61,10 @@ exports.me = async (req, res) => {
   }
 };
 
-
-
-
 exports.sendEmailOtp = async (req, res) => {
   try {
-    const { email } = req.body;
-
+    const { name, email } = req.body;
+    console.log(req.body);
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -75,8 +72,21 @@ exports.sendEmailOtp = async (req, res) => {
       });
     }
 
-    // ✅ CHECK: user must already exist
-    const user = await User.findOne({ email });
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 🔥 DEV TEST EMAIL BYPASS (ONLY FOR DEVELOPMENT)
+    if (
+      process.env.NODE_ENV !== "production" &&
+      cleanEmail === process.env.TEST_EMAIL?.trim().toLowerCase()
+    ) {
+      return res.json({
+        success: true,
+        message: "Test OTP sent",
+      });
+    }
+
+    // ✅ Normal Flow
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
       return res.status(404).json({
@@ -84,19 +94,21 @@ exports.sendEmailOtp = async (req, res) => {
         message: "User not registered. Please sign up.",
       });
     }
+    const userName = user.name;
+
+    const firstName = user.name?.split(" ")[0] || "User";
 
     const otp = generateOtp();
 
-    // Remove old OTPs
-    await Otp.deleteMany({ identifier: email });
+    await Otp.deleteMany({ identifier: cleanEmail });
 
     await Otp.create({
-      identifier: email,
-      otp,
+      identifier: cleanEmail,
+      otp: String(otp),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    await sendOtpEmail(email, otp);
+    await sendOtpEmail(firstName, cleanEmail, otp);
 
     return res.json({
       success: true,
@@ -111,13 +123,9 @@ exports.sendEmailOtp = async (req, res) => {
   }
 };
 
-
-
-
-
 exports.verifyEmailOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { name, email, otp } = req.body;
 
     if (!email || !otp) {
       return res.status(400).json({
@@ -126,10 +134,47 @@ exports.verifyEmailOtp = async (req, res) => {
       });
     }
 
-    // 🔑 Ensure OTP is string-safe
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
+    // 🔥 DEV TEST LOGIN (SAFE)
+    if (
+      process.env.NODE_ENV !== "production" &&
+      cleanEmail === process.env.TEST_EMAIL?.trim().toLowerCase() &&
+      cleanOtp === String(process.env.TEST_OTP).trim()
+    ) {
+      let user = await User.findOne({ email: cleanEmail });
+
+      if (!user) {
+        user = new User({
+          name: "Test Basic User",
+          email: cleanEmail,
+          mobile: "9999999999",
+          role: "PATIENT",
+          isVerified: true,
+        });
+
+        applyPlan(user, "FREE");
+        await user.save();
+      }
+
+      const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" },
+      );
+
+      return res.json({
+        success: true,
+        token,
+        user,
+      });
+    }
+
+    // ✅ NORMAL OTP FLOW
     const record = await Otp.findOne({
-      identifier: email,
-      otp: String(otp),
+      identifier: cleanEmail,
+      otp: cleanOtp,
     });
 
     if (!record || record.expiresAt < new Date()) {
@@ -139,10 +184,9 @@ exports.verifyEmailOtp = async (req, res) => {
       });
     }
 
-    await Otp.deleteMany({ identifier: email });
+    await Otp.deleteMany({ identifier: cleanEmail });
 
-    // 🔍 USER MUST EXIST
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
       return res.status(404).json({
@@ -154,7 +198,7 @@ exports.verifyEmailOtp = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return res.json({
@@ -170,7 +214,6 @@ exports.verifyEmailOtp = async (req, res) => {
     });
   }
 };
-
 
 exports.sendRegisterOtp = async (req, res) => {
   try {
@@ -202,7 +245,10 @@ exports.sendRegisterOtp = async (req, res) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    await sendOtpEmail(email, otp);
+    const userName = user.name;
+    const firstName = user.name?.split(" ")[0] || "User";
+
+    await sendOtpEmail(firstName, email, otp);
 
     return res.json({
       success: true,
@@ -253,7 +299,7 @@ exports.verifyRegisterOtp = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return res.json({
@@ -270,8 +316,6 @@ exports.verifyRegisterOtp = async (req, res) => {
   }
 };
 
-
-
 console.log({
   sendRegisterOtp: typeof exports.sendRegisterOtp,
   verifyRegisterOtp: typeof exports.verifyRegisterOtp,
@@ -280,4 +324,3 @@ console.log({
 });
 
 // console.log("OTP RECORD FOUND:", record);
-

@@ -64,6 +64,10 @@ app.use("/api/ai", require("./routes/aiRoutes"));
 app.use("/api/chat", require("./routes/chatRoutes"));
 app.use("/api/plans", require("./routes/planRoutes"));
 
+// app.use("/api/consultation", require("./routes/consultationRoutes"));
+// app.use("/api/webhooks", require("./routes/calendly.webhook.routes"));
+
+
 console.log("MSG91 KEY:", process.env.MSG91_AUTHKEY ? "LOADED" : "MISSING");
 
 const PORT = process.env.PORT || 5000;

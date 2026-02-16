@@ -1,18 +1,18 @@
 const https = require("https");
 
-module.exports = function sendOtpEmail(email, otp) {
+module.exports = function sendOtpEmail(name, email, otp) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({
       recipients: [
         {
           to: [
             {
-              name: email,
+              name: name,
               email: email,
             },
           ],
           variables: {
-            VAR1: email,        // Hello {{VAR1}}
+            VAR1: name,        // Hello {{VAR1}}
             VAR2: otp,          // {{VAR2}}
             VAR3: 10,           // {{VAR3}} minutes
           },
