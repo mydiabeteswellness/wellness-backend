@@ -240,13 +240,13 @@ exports.sendRegisterOtp = async (req, res) => {
 
     await Otp.create({
       identifier: email,
-      otp,
+      otp: String(otp),
       payload: { name, email, mobile, role },
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    const userName = user.name;
-    const firstName = user.name?.split(" ")[0] || "User";
+    // ✅ FIXED HERE
+    const firstName = name?.split(" ")[0] || "User";
 
     await sendOtpEmail(firstName, email, otp);
 
@@ -259,6 +259,7 @@ exports.sendRegisterOtp = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 
 exports.verifyRegisterOtp = async (req, res) => {
   try {
