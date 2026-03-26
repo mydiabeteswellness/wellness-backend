@@ -68,7 +68,7 @@ app.use("/api/consultation", require("./routes/consultationRoutes"));
 app.use("/api/webhooks", require("./routes/calendly.webhook.routes"));
 
 
-console.log("MSG91 KEY:", process.env.MSG91_AUTHKEY ? "LOADED" : "MISSING");
+console.log("MSG91 KEY:", process.env.MSG91_AUTH_KEY ? "LOADED" : "MISSING");
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
