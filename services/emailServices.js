@@ -32,7 +32,7 @@ module.exports = function sendOtpEmail(name, email, otp) {
       method: "POST",
       headers: {
         accept: "application/json",
-        authkey: process.env.MSG91_AUTHKEY,
+        authkey: process.env.MSG91_AUTH_KEY,
         "content-type": "application/json",
         "content-length": Buffer.byteLength(payload),
       },
